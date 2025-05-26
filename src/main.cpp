@@ -659,7 +659,10 @@ void neuromeka_task(void *parameters)
         if(robot[i] == 1)
         {
           if(pRobot[i] == 0)
+          {
             motor[i] = 1;
+            modbus.writeHreg(IP, neuromeka_address + 4 + i, motor[i]);
+          }
           else if(motor[i] == 2)
             modbus.writeHreg(IP, neuromeka_address + 4 + i, motor[i]);
         }
