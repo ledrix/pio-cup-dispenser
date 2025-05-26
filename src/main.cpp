@@ -652,7 +652,7 @@ void neuromeka_task(void *parameters)
       
       modbus.readHreg(IP, neuromeka_address + i, &robot[i], 1);
 
-      //Serial.printf("i:%d | rbt:%d / p:%d | pcb:%d\n", i+1, robot[i], pRobot[i], motor[i]);//TEST ONLY!
+      Serial.printf("i:%d | rbt:%d / p:%d | pcb:%d\n", i+1, robot[i], pRobot[i], motor[i]);//TEST ONLY!
 
       if(robot[i] > 0)
       {
@@ -675,11 +675,13 @@ void neuromeka_task(void *parameters)
           else if(motor[i] == 2)
             motor[i] = 3;
         }
+        pRobot[i] = robot[i];
       }
       else
+      {
+        pRobot[i] = robot[i];
         i = (i + 1 >= 4) ? 0 : i + 1;
-
-      pRobot[i] = robot[i];
+      }
     }
     vTaskDelay(pdMS_TO_TICKS(1000/neuromeka_refresh));
   }
