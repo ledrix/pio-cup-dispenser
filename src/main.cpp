@@ -650,7 +650,7 @@ void neuromeka_task(void *parameters)
     {
       modbus.task();
       
-      modbus.readHreg(IP, neuromeka_address + i, &robot[i], 1);
+      modbus.readHreg(IP, neuromeka_address, robot, 4);
 
       Serial.printf("i:%d | rbt:%d / p:%d | pcb:%d\n", i+1, robot[i], pRobot[i], motor[i]);//TEST ONLY!
 
