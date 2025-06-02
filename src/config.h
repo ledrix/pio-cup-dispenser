@@ -26,7 +26,7 @@ const int   kuka_refresh  = 10; //Hz
 #endif //KUKA
 
 #ifdef NEUROMEKA_ROBOT
-const char* neuromeka_IP      = "192.168.15.46";
+const char* neuromeka_IP      = "192.168.167.199";
 const int   neuromeka_address = 901;
 const int   neuromeka_refresh =  10; //Hz
 #endif //NEUROMEKA

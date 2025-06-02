@@ -434,6 +434,11 @@ void setup()
     else
       server.send(200, "text/plain", "[" + String(name) + "]: Error!\nArgs:\nMotor -> [1, 4]\n");
   });
+  server.on("/wr", []()
+  {    
+    server.send(200, "text/plain", "Credenciais Wifi Resetadas\n");
+    wifi.resetSettings();
+  });
   server.onNotFound([](){ server.send(200, "text/plain", "[" + String(name) + "]: Not Found!\n"); });
   server.begin();
 
