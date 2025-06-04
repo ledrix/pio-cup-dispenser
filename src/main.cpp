@@ -14,9 +14,9 @@
 #ifdef KUKA_ROBOT
 #include <KukaVar.h>
 #endif //KUKA_ROBOT
-#ifdef NEUROMEKA_ROBOT
+#ifdef MODBUS_ROBOT
 #include <ModbusEthernet.h>
-#endif //NEUROMEKA_ROBOT
+#endif //MODBUS_ROBOT
 #include <ESPmDNS.h>
 #include <WebServer.h>
 #include <PubSubClient.h>
@@ -36,11 +36,11 @@ PubSubClient mqtt(mqtt_client);
 SSD1306Wire OLED(0x3C, SDA, SCL, GEOMETRY_128_32);
 #ifdef KUKA_ROBOT
 NetworkClient kuka_client;
-KukaVar kuka(kuka_IP, 7000, kuka_client);
+KukaVar kuka(KUKA_IP, 7000, kuka_client);
 #endif //KUKA_ROBOT
-#ifdef NEUROMEKA_ROBOT
+#ifdef MODBUS_ROBOT
 ModbusEthernet modbus;
-#endif //NEUROMEKA_ROBOT
+#endif //MODBUS_ROBOT
 //------------------------------------------------
 
 //Global Variables -------------------------------
@@ -78,7 +78,7 @@ TaskHandle_t mqtt_taskhandle = nullptr;
 TaskHandle_t motor_taskhandle = nullptr;
 TaskHandle_t ina219_taskhandle = nullptr;
 TaskHandle_t statusLED_taskhandle = nullptr;
-TaskHandle_t neuromeka_taskhandle = nullptr;
+TaskHandle_t modbus_taskhandle = nullptr;
 //------------------------------------------------
 
 //Function Prototypes ----------------------------
@@ -90,7 +90,7 @@ void mqtt_task(void *parameters);
 void motor_task(void *parameters);
 void ina219_task(void *parameters);
 void statusLED_task(void *parameters);
-void neuromeka_task(void *parameters);
+void modbus_task(void *parameters);
 //------------------------------------------------
 
 //Interrupt Handlers -----------------------------
@@ -148,7 +148,7 @@ void setup()
   // Initialize Ethernet
   Ethernet.setHostname(name);
   Ethernet.init(w5500);
-  Ethernet.begin();
+  Ethernet.begin(5000);
   if(Ethernet.hardwareStatus() == EthernetNoHardware)
     Serial.println("[Ethernet]: Hardware not found!");
   else if(Ethernet.linkStatus() == LinkOFF)
@@ -191,7 +191,7 @@ void setup()
 
 #ifdef KUKA_ROBOT
   xTaskCreatePinnedToCore(  kuka_task,
-                            "KUKA Robot",
+                            "KukaVar",
                             8192,
                             nullptr,
                             1,
@@ -199,15 +199,15 @@ void setup()
                             ARDUINO_RUNNING_CORE );
 #endif //KUKA_ROBOT
 
-#ifdef NEUROMEKA_ROBOT
-  xTaskCreatePinnedToCore(  neuromeka_task,
-                            "Neuromeka Robot",
+#ifdef MODBUS_ROBOT
+  xTaskCreatePinnedToCore(  modbus_task,
+                            "Modbus TCP",
                             8192,
                             nullptr,
                             1,
-                            &neuromeka_taskhandle,
+                            &modbus_taskhandle,
                             ARDUINO_RUNNING_CORE );
-#endif //NEUROMEKA_ROBOT
+#endif //MODBUS_ROBOT
   
   xTaskCreatePinnedToCore(  statusLED_task,
                             "Status LED",
@@ -434,11 +434,6 @@ void setup()
     else
       server.send(200, "text/plain", "[" + String(name) + "]: Error!\nArgs:\nMotor -> [1, 4]\n");
   });
-  server.on("/wr", []()
-  {    
-    server.send(200, "text/plain", "Credenciais Wifi Resetadas\n");
-    wifi.resetSettings();
-  });
   server.onNotFound([](){ server.send(200, "text/plain", "[" + String(name) + "]: Not Found!\n"); });
   server.begin();
 
@@ -518,25 +513,6 @@ void ina219_task(void *parameters)
     ina219.setCalibration_32V_2A();
     Serial.println("[INA219]: Initializing...OK");
     current_sensor = true;
-
-    // vTaskSuspend(motor_taskhandle);
-    // for(int i = 0; i < 4; i++)
-    //   digitalWrite(enablePin[i], HIGH);
-    // for(int i = 0; i < 4; i++)
-    // {
-    //   digitalWrite(enablePin[i], LOW);
-    //   delay(1000);
-    //   double total = 0;
-    //   for(int m = 0; m < 100; m++)
-    //   {
-    //     current = ina219.getCurrent_mA();
-    //     total += current;
-    //     vTaskDelay(pdMS_TO_TICKS(10));
-    //   }
-    //   i_hold[i] = total/100;
-    //   digitalWrite(enablePin[i], HIGH);
-    // }
-    // vTaskResume(motor_taskhandle);
   }
   else
   {
@@ -547,6 +523,7 @@ void ina219_task(void *parameters)
   
   for(;;)
   {
+    // current = ina219.getCurrent_mA() * (0.1 / R_SHUNT);
     current = ina219.getCurrent_mA();
     voltage = ina219.getBusVoltage_V();
     vTaskDelay(pdMS_TO_TICKS(2));
@@ -564,13 +541,13 @@ void kuka_task(void *parameters)
 
   for(;;)
   {
-    vTaskDelay(pdMS_TO_TICKS(1000/kuka_refresh));
+    vTaskDelay(pdMS_TO_TICKS(1000/KUKA_RATE));
     
     robot_connected = kuka.connected();
     if(robot_connected)
     {
-      response = kuka.read(String(kuka_var) + "[" + (i + 1) + "]");
-      Serial.printf("%s[%d] = %s", kuka_var, (i + 1), response);
+      response = kuka.read(String(KUKA_VAR) + "[" + (i + 1) + "]");
+      Serial.printf("%s[%d] = %s", KUKA_VAR, (i + 1), response);
 
       if(response.indexOf("ERROR") != -1)
         continue;
@@ -585,7 +562,7 @@ void kuka_task(void *parameters)
             motor[i] = 1;
           else if(motor[i] == 2)
           {
-            if(!kuka.write(String(kuka_var) + "[" + (i + 1) + "]", String(motor[i])))
+            if(!kuka.write(String(KUKA_VAR) + "[" + (i + 1) + "]", String(motor[i])))
               continue;
           }
         }
@@ -593,7 +570,7 @@ void kuka_task(void *parameters)
         {
           if(motor[i] == 3)
           {
-            if(!kuka.write(String(kuka_var) + "[" + (i + 1) + "]", String(motor[i])))
+            if(!kuka.write(String(KUKA_VAR) + "[" + (i + 1) + "]", String(motor[i])))
               continue;
           }
         }
@@ -601,7 +578,7 @@ void kuka_task(void *parameters)
         {
           if(motor[i] == 0)
           {
-            if(!kuka.write(String(kuka_var) + "[" + (i + 1) + "]", String(motor[i])))
+            if(!kuka.write(String(KUKA_VAR) + "[" + (i + 1) + "]", String(motor[i])))
               continue;
           }
           else if(motor[i] == 2)
@@ -626,11 +603,11 @@ void kuka_task(void *parameters)
 #endif //KUKA_ROBOT
 
 
-#ifdef NEUROMEKA_ROBOT
-void neuromeka_task(void *parameters)
+#ifdef MODBUS_ROBOT
+void modbus_task(void *parameters)
 {
   IPAddress IP;
-  IP.fromString(neuromeka_IP);
+  IP.fromString(MODBUS_IP);
 
   uint8_t i = 0;
   uint16_t robot[] = {0, 0, 0, 0};
@@ -642,22 +619,22 @@ void neuromeka_task(void *parameters)
     robot_connected = modbus.isConnected(IP);
     if(!robot_connected)
     {
-      Serial.println("[Neuromeka]: Connecting...");
+      Serial.println("[Modbus TCP]: Connecting...");
       if(!modbus.connect(IP, 502))
       {
-        Serial.println("[Neuromeka]: Connecting...FAIL");
-        vTaskDelay(pdMS_TO_TICKS(100));
+        Serial.println("[Modbus TCP]: Connecting...FAIL");
+        vTaskDelay(pdMS_TO_TICKS(1000));
         continue;
       }
-      Serial.println("[Neuromeka]: Connecting...OK");
+      Serial.println("[Modbus TCP]: Connecting...OK");
     }
     else
     {
       modbus.task();
       
-      modbus.readHreg(IP, neuromeka_address, robot, 4);
+      modbus.readHreg(IP, MODBUS_ADDR, robot, 4);
 
-      Serial.printf("i:%d | rbt:%d / p:%d | pcb:%d\n", i+1, robot[i], pRobot[i], motor[i]);//TEST ONLY!
+      Serial.printf("i:%d | rbt:%d / p:%d | pcb:%d\n", i+1, robot[i], pRobot[i], motor[i]); //TEST ONLY!
 
       if(robot[i] > 0)
       {
@@ -666,22 +643,25 @@ void neuromeka_task(void *parameters)
           if(pRobot[i] == 0)
           {
             motor[i] = 1;
-            modbus.writeHreg(IP, neuromeka_address + 4 + i, motor[i]);
+            modbus.writeHreg(IP, MODBUS_ADDR + 4 + i, motor[i]);
           }
           else if(motor[i] == 2)
-            modbus.writeHreg(IP, neuromeka_address + 4 + i, motor[i]);
+            modbus.writeHreg(IP, MODBUS_ADDR + 4 + i, motor[i]);
         }
         else if(robot[i] == 2)
         {
           if(motor[i] == 3)
-            modbus.writeHreg(IP, neuromeka_address + 4 + i, motor[i]);
+            modbus.writeHreg(IP, MODBUS_ADDR + 4 + i, motor[i]);
         }
         else if(robot[i] == 3)
         {
           if(motor[i] == 0)
-            modbus.writeHreg(IP, neuromeka_address + 4 + i, motor[i]);
+            modbus.writeHreg(IP, MODBUS_ADDR + 4 + i, motor[i]);
           else if(motor[i] == 2)
+          {
             motor[i] = 3;
+            modbus.writeHreg(IP, MODBUS_ADDR + 4 + i, motor[i]);
+          } 
         }
         pRobot[i] = robot[i];
       }
@@ -691,10 +671,10 @@ void neuromeka_task(void *parameters)
         i = (i + 1 >= 4) ? 0 : i + 1;
       }
     }
-    vTaskDelay(pdMS_TO_TICKS(1000/neuromeka_refresh));
+    vTaskDelay(pdMS_TO_TICKS(1000/MODBUS_RATE));
   }
 }
-#endif //NEUROMEKA_ROBOT
+#endif //MODBUS_ROBOT
 
 
 void callback(char* topic, byte* payload, unsigned int length) 
@@ -760,7 +740,7 @@ void mqtt_task(void *parameters)
       mqtt.publish((String(name) + "/current").c_str(), String(current, 0).c_str());
       mqtt.publish((String(name) + "/voltage").c_str(), String(voltage, 2).c_str());
 
-      vTaskDelay(pdMS_TO_TICKS(1000/mqtt_rate));
+      vTaskDelay(pdMS_TO_TICKS(1000/MQTT_RATE));
     }
   }
 }
@@ -902,15 +882,6 @@ void boot_screen()
     }
   }
   while(!current_sensor);
-
-  // OLED.clear();  
-  // OLED.drawString(64, 1, "Motor Calibration");
-  // for (int i = 0; i <= 100; i++)
-  // {
-  //   OLED.drawProgressBar(4, 24, 120, 6, i);
-  //   OLED.display();
-  //   delay(40);
-  // }
 }
 
 void dashboard_screen()
@@ -963,11 +934,11 @@ void dashboard_screen()
   OLED.drawHorizontalLine(65, 22, 64);
   OLED.setTextAlignment(TEXT_ALIGN_CENTER);
 #ifdef KUKA_ROBOT
-  OLED.drawString(97, 22, "KUKA");
+  OLED.drawString(97, 22, "KukaVar");
 #endif //KUKA_ROBOT
-#ifdef NEUROMEKA_ROBOT
-  OLED.drawString(97, 22, "Neuromeka");
-#endif //NEUROMEKA_ROBOT
+#ifdef MODBUS_ROBOT
+  OLED.drawString(97, 22, "Modbus");
+#endif //MODBUS_ROBOT
   OLED.setTextAlignment(TEXT_ALIGN_RIGHT);
   OLED.drawString(83, 0,  "V =");
   OLED.drawString(83, 10, "i  =");

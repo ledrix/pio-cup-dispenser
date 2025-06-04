@@ -6,8 +6,8 @@
 #define DEBUG
 // #define RELEASE
 
-//#define KUKA_ROBOT
-#define NEUROMEKA_ROBOT
+// #define KUKA_ROBOT
+#define MODBUS_ROBOT
 
 #define NO_LIM_SW
 
@@ -17,19 +17,21 @@ byte ETH_IP[]           = {192, 168, 15, 40};
 byte ETH_MAC[]          = {0xD0, 0xD0, 0xD0, 0xD0, 0xD0, 0xD0};
 
 const char* MQTT_IP     = "192.168.15.93";
-const int   mqtt_rate   = 100; //Hz
+const int   MQTT_RATE   = 100; //Hz
 
 #ifdef KUKA_ROBOT
-const char* kuka_IP       = "192.168.15.147";
-const char* kuka_var      = "CUP_DISPENSER";
-const int   kuka_refresh  = 10; //Hz
+const char* KUKA_IP     = "192.168.15.147";
+const char* KUKA_VAR    = "CUP_DISPENSER";
+const int   KUKA_RATE   = 10; //Hz
 #endif //KUKA
 
-#ifdef NEUROMEKA_ROBOT
-const char* neuromeka_IP      = "192.168.167.199";
-const int   neuromeka_address = 901;
-const int   neuromeka_refresh =  10; //Hz
-#endif //NEUROMEKA
+#ifdef MODBUS_ROBOT
+const char* MODBUS_IP   = "192.168.15.46";
+const int   MODBUS_ADDR = 901;
+const int   MODBUS_RATE = 100; //Hz
+#endif //MODBUS_ROBOT
+
+const double R_SHUNT = 0.05; //Ohm
 
 const bool NPN = LOW;
 const bool PNP = HIGH;
