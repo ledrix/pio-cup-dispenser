@@ -16,7 +16,7 @@ const char* name        = "Cup";
 byte ETH_IP[]           = {192, 168, 15, 40};
 byte ETH_MAC[]          = {0xD0, 0xD0, 0xD0, 0xD0, 0xD0, 0xD0};
 
-const char* MQTT_IP     = "192.168.15.93";
+const char* MQTT_IP     = "192.168.167.101";
 const int   MQTT_RATE   = 100; //Hz
 
 #ifdef KUKA_ROBOT
